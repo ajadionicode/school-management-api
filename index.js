@@ -2,6 +2,12 @@ const config                = require('./config/index.config.js');
 const Cortex                = require('ion-cortex');
 const ManagersLoader        = require('./loaders/ManagersLoader.js');
 const Aeon                  = require('aeon-machine');
+const mongo                 = require('./connect/mongo.js');
+
+// Connect to MongoDB
+if (config.dotEnv.MONGO_URI) {
+    mongo({ uri: config.dotEnv.MONGO_URI });
+}
 
 process.on('uncaughtException', err => {
     console.log(`Uncaught Exception:`)
