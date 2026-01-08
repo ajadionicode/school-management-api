@@ -41,4 +41,7 @@ const schoolSchema = new mongoose.Schema({
     timestamps: true
 });
 
+schoolSchema.index({ isDeleted: 1 });
+schoolSchema.index({ name: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('School', schoolSchema);

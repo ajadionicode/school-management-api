@@ -80,4 +80,8 @@ const studentSchema = new mongoose.Schema({
     timestamps: true
 });
 
+studentSchema.index({ schoolId: 1, isDeleted: 1 });
+studentSchema.index({ schoolId: 1, classroomId: 1, isDeleted: 1 });
+studentSchema.index({ schoolId: 1, status: 1, isDeleted: 1 });
+
 module.exports = mongoose.model('Student', studentSchema);
