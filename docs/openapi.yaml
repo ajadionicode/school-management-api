@@ -1,0 +1,1134 @@
+openapi: 3.0.3
+info:
+  title: School Management System API
+  description: |
+    RESTful API for managing schools, classrooms, and students.
+
+    ## Authentication
+    This API uses JWT-based authentication with two token types:
+    - **Long Token** (3 years): Master key used to generate short tokens
+    - **Short Token** (1 year): Device-bound token used for API requests
+
+    Include the short token in the `token` header for authenticated requests.
+
+    ## Roles
+    - **superadmin**: Full system access, manages schools and users
+    - **school_admin**: School-specific access, manages classrooms and students
+
+    ## Multi-tenancy
+    Data is isolated by school. School admins can only access their assigned school's resources.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:5111
+    description: Development server
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Users
+    description: User management (Superadmin only)
+  - name: Schools
+    description: School management (Superadmin only)
+  - name: Classrooms
+    description: Classroom management (School Admin)
+  - name: Students
+    description: Student management (School Admin)
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      description: Authenticate user and receive tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: Username or email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/UserBasic'
+                      longToken:
+                        type: string
+                      shortToken:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/refreshToken:
+    post:
+      tags: [Auth]
+      summary: Refresh short token
+      description: Generate new short token using long token
+      security:
+        - LongTokenAuth: []
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      shortToken:
+                        type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/changePassword:
+    post:
+      tags: [Auth]
+      summary: Change password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password changed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/createUser:
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Create a new user (Superadmin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password, role]
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 20
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                role:
+                  type: string
+                  enum: [superadmin, school_admin]
+                schoolId:
+                  type: string
+                  description: Required for school_admin role
+      responses:
+        '200':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      longToken:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/user/getUsers:
+    get:
+      tags: [Users]
+      summary: List users
+      description: Get paginated list of users (Superadmin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [superadmin, school_admin]
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /api/user/getUser:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/user/updateUser:
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                username:
+                  type: string
+                email:
+                  type: string
+                role:
+                  type: string
+                  enum: [superadmin, school_admin]
+                schoolId:
+                  type: string
+      responses:
+        '200':
+          description: User updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/user/deleteUser:
+    delete:
+      tags: [Users]
+      summary: Delete user (soft delete)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+      responses:
+        '200':
+          description: User deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/school/createSchool:
+    post:
+      tags: [Schools]
+      summary: Create school
+      description: Create a new school (Superadmin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                address:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                principalName:
+                  type: string
+                establishedYear:
+                  type: integer
+      responses:
+        '200':
+          description: School created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      school:
+                        $ref: '#/components/schemas/School'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/school/getSchools:
+    get:
+      tags: [Schools]
+      summary: List schools
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schools list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      schools:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/School'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /api/school/getSchool:
+    get:
+      tags: [Schools]
+      summary: Get school by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: School details
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/school/updateSchool:
+    put:
+      tags: [Schools]
+      summary: Update school
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                address:
+                  type: string
+                phone:
+                  type: string
+                email:
+                  type: string
+                principalName:
+                  type: string
+      responses:
+        '200':
+          description: School updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/school/deleteSchool:
+    delete:
+      tags: [Schools]
+      summary: Delete school (soft delete)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+      responses:
+        '200':
+          description: School deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/classroom/createClassroom:
+    post:
+      tags: [Classrooms]
+      summary: Create classroom
+      description: Create a classroom in your school (School Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, capacity]
+              properties:
+                name:
+                  type: string
+                capacity:
+                  type: integer
+                  minimum: 1
+                grade:
+                  type: string
+                section:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Classroom created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      classroom:
+                        $ref: '#/components/schemas/Classroom'
+
+  /api/classroom/getClassrooms:
+    get:
+      tags: [Classrooms]
+      summary: List classrooms
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+          description: Required for superadmin
+        - name: grade
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Classrooms list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      classrooms:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Classroom'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /api/classroom/getClassroom:
+    get:
+      tags: [Classrooms]
+      summary: Get classroom by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+          description: Required for superadmin
+      responses:
+        '200':
+          description: Classroom details
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/classroom/updateClassroom:
+    put:
+      tags: [Classrooms]
+      summary: Update classroom
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                capacity:
+                  type: integer
+                grade:
+                  type: string
+                section:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Classroom updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/classroom/deleteClassroom:
+    delete:
+      tags: [Classrooms]
+      summary: Delete classroom (soft delete)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Classroom deleted
+        '400':
+          description: Cannot delete classroom with students
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/student/createStudent:
+    post:
+      tags: [Students]
+      summary: Enroll student
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                dateOfBirth:
+                  type: string
+                  format: date
+                gender:
+                  type: string
+                  enum: [male, female, other]
+                classroomId:
+                  type: string
+                guardianName:
+                  type: string
+                guardianPhone:
+                  type: string
+                guardianEmail:
+                  type: string
+                address:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Student enrolled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      student:
+                        $ref: '#/components/schemas/Student'
+
+  /api/student/getStudents:
+    get:
+      tags: [Students]
+      summary: List students
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+          description: Required for superadmin
+        - name: classroomId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [enrolled, transferred, graduated, withdrawn]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Students list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      students:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Student'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+  /api/student/getStudent:
+    get:
+      tags: [Students]
+      summary: Get student by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: schoolId
+          in: query
+          schema:
+            type: string
+          description: Required for superadmin
+      responses:
+        '200':
+          description: Student details
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/student/updateStudent:
+    put:
+      tags: [Students]
+      summary: Update student
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                dateOfBirth:
+                  type: string
+                  format: date
+                gender:
+                  type: string
+                  enum: [male, female, other]
+                status:
+                  type: string
+                  enum: [enrolled, transferred, graduated, withdrawn]
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Student updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/student/deleteStudent:
+    delete:
+      tags: [Students]
+      summary: Delete student (soft delete)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Student deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/student/transferStudent:
+    post:
+      tags: [Students]
+      summary: Transfer student to another school
+      description: Transfer a student between schools (Superadmin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, toSchoolId]
+              properties:
+                studentId:
+                  type: string
+                toSchoolId:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Student transferred
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      student:
+                        $ref: '#/components/schemas/Student'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/student/assignClassroom:
+    put:
+      tags: [Students]
+      summary: Assign student to classroom
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, classroomId]
+              properties:
+                studentId:
+                  type: string
+                classroomId:
+                  type: string
+                schoolId:
+                  type: string
+                  description: Required for superadmin
+      responses:
+        '200':
+          description: Student assigned to classroom
+        '400':
+          description: Classroom at full capacity
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: Short token for API access
+    LongTokenAuth:
+      type: apiKey
+      in: header
+      name: token
+      description: Long token for refreshing short tokens
+
+  parameters:
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    sortBy:
+      name: sortBy
+      in: query
+      schema:
+        type: string
+        default: createdAt
+    sortOrder:
+      name: sortOrder
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+  schemas:
+    UserBasic:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [superadmin, school_admin]
+        schoolId:
+          type: string
+          nullable: true
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/UserBasic'
+        - type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+
+    School:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        principalName:
+          type: string
+        establishedYear:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Classroom:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        schoolId:
+          type: string
+        capacity:
+          type: integer
+        grade:
+          type: string
+        section:
+          type: string
+        studentCount:
+          type: integer
+        availableSeats:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, other]
+        schoolId:
+          type: string
+        classroomId:
+          type: string
+        status:
+          type: string
+          enum: [enrolled, transferred, graduated, withdrawn]
+        enrollmentDate:
+          type: string
+          format: date-time
+        guardianName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: string
+        address:
+          type: string
+        transferHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              fromSchoolId:
+                type: string
+              toSchoolId:
+                type: string
+              transferDate:
+                type: string
+                format: date-time
+              reason:
+                type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              errors:
+                oneOf:
+                  - type: string
+                  - type: array
+                    items:
+                      type: object
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              code:
+                type: integer
+                example: 401
+              errors:
+                type: string
+                example: unauthorized
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              code:
+                type: integer
+                example: 403
+              errors:
+                type: string
+                example: forbidden - superadmin access required
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              error:
+                type: string
+              code:
+                type: integer
+                example: 404
