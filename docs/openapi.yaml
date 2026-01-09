@@ -104,10 +104,61 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: Invalidate all tokens for the current user
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Get the profile of the currently authenticated user
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        allOf:
+                          - $ref: '#/components/schemas/UserBasic'
+                          - type: object
+                            properties:
+                              school:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                  name:
+                                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/auth/changePassword:
     post:
       tags: [Auth]
       summary: Change password
+      description: |
+        Change the current user's password. Password must be at least 8 characters
+        and contain at least 1 uppercase, 1 lowercase, and 1 number.
       security:
         - BearerAuth: []
       requestBody:
@@ -125,6 +176,7 @@ paths:
                   type: string
                   format: password
                   minLength: 8
+                  description: Must contain uppercase, lowercase, and number
       responses:
         '200':
           description: Password changed
@@ -447,6 +499,104 @@ paths:
       responses:
         '200':
           description: School deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/school/getStatistics:
+    get:
+      tags: [Schools]
+      summary: Get school statistics
+      description: |
+        Get detailed statistics for a school including classroom counts,
+        student enrollment, capacity utilization, and breakdowns by grade.
+        School admins can only view their own school's statistics.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: School ID (required for superadmin, optional for school_admin)
+      responses:
+        '200':
+          description: School statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      school:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          name:
+                            type: string
+                      statistics:
+                        type: object
+                        properties:
+                          totalClassrooms:
+                            type: integer
+                          totalStudents:
+                            type: integer
+                          activeStudents:
+                            type: integer
+                          totalCapacity:
+                            type: integer
+                          availableSeats:
+                            type: integer
+                          utilizationRate:
+                            type: integer
+                            description: Percentage of capacity utilized
+                          statusDistribution:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                          genderDistribution:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                          gradeBreakdown:
+                            type: object
+                            additionalProperties:
+                              type: object
+                              properties:
+                                classrooms:
+                                  type: integer
+                                students:
+                                  type: integer
+                                capacity:
+                                  type: integer
+                          classroomBreakdown:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                name:
+                                  type: string
+                                grade:
+                                  type: string
+                                section:
+                                  type: string
+                                capacity:
+                                  type: integer
+                                studentCount:
+                                  type: integer
+                                availableSeats:
+                                  type: integer
+                                utilizationRate:
+                                  type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1132,3 +1282,37 @@ components:
               code:
                 type: integer
                 example: 404
+
+    RateLimited:
+      description: Too many requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when window resets
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ok:
+                type: boolean
+                example: false
+              error:
+                type: string
+                example: Rate limit exceeded
+              code:
+                type: integer
+                example: 429

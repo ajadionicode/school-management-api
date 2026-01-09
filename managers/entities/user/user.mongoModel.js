@@ -28,6 +28,20 @@ const userSchema = new mongoose.Schema({
         ref: 'School',
         default: null
     },
+    // Account lockout fields
+    failedLoginAttempts: {
+        type: Number,
+        default: 0
+    },
+    lockoutUntil: {
+        type: Date,
+        default: null
+    },
+    // Token management
+    tokenVersion: {
+        type: Number,
+        default: 0
+    },
     isDeleted: {
         type: Boolean,
         default: false

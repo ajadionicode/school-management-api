@@ -11,6 +11,7 @@ module.exports = class School {
             'createSchool',
             'get=getSchool',
             'get=getSchools',
+            'get=getStatistics',
             'put=updateSchool',
             'delete=deleteSchool'
         ];
@@ -197,5 +198,127 @@ module.exports = class School {
         }
 
         return { message: 'School deleted successfully' };
+    }
+
+    async getStatistics({ __schoolToken, __superadmin, __schoolAdmin, id }) {
+        // Determine which school to get statistics for
+        let schoolId = id;
+
+        // If school admin, they can only view their own school's statistics
+        if (__schoolAdmin && !__superadmin) {
+            if (id && id !== __schoolAdmin.schoolId) {
+                return { error: 'Access denied', code: 403 };
+            }
+            schoolId = __schoolAdmin.schoolId;
+        }
+
+        if (!schoolId) {
+            return { error: 'School ID is required', code: 400 };
+        }
+
+        // Verify school exists
+        const school = await this.mongomodels.school.findOne({
+            _id: schoolId,
+            isDeleted: false
+        });
+
+        if (!school) {
+            return { error: 'School not found', code: 404 };
+        }
+
+        // Get classroom statistics
+        const classrooms = await this.mongomodels.classroom.find({
+            schoolId: schoolId,
+            isDeleted: false
+        });
+
+        const totalClassrooms = classrooms.length;
+        const totalCapacity = classrooms.reduce((sum, c) => sum + (c.capacity || 0), 0);
+
+        // Get student statistics
+        const students = await this.mongomodels.student.find({
+            schoolId: schoolId,
+            isDeleted: false
+        });
+
+        const totalStudents = students.length;
+        const activeStudents = students.filter(s => s.status === 'enrolled' || s.status === 'active').length;
+
+        // Student status distribution
+        const statusDistribution = {};
+        students.forEach(s => {
+            const status = s.status || 'unknown';
+            statusDistribution[status] = (statusDistribution[status] || 0) + 1;
+        });
+
+        // Student gender distribution
+        const genderDistribution = {};
+        students.forEach(s => {
+            const gender = s.gender || 'unspecified';
+            genderDistribution[gender] = (genderDistribution[gender] || 0) + 1;
+        });
+
+        // Breakdown by grade level
+        const gradeBreakdown = {};
+        for (const classroom of classrooms) {
+            const grade = classroom.grade || 'unassigned';
+            if (!gradeBreakdown[grade]) {
+                gradeBreakdown[grade] = { classrooms: 0, students: 0, capacity: 0 };
+            }
+            gradeBreakdown[grade].classrooms += 1;
+            gradeBreakdown[grade].capacity += classroom.capacity || 0;
+
+            // Count students in this classroom
+            const classroomStudents = students.filter(s =>
+                s.classroomId && s.classroomId.toString() === classroom._id.toString()
+            );
+            gradeBreakdown[grade].students += classroomStudents.length;
+        }
+
+        // Breakdown by classroom
+        const classroomBreakdown = await Promise.all(classrooms.map(async (classroom) => {
+            const studentCount = await this.mongomodels.student.countDocuments({
+                classroomId: classroom._id,
+                schoolId: schoolId,
+                isDeleted: false
+            });
+
+            return {
+                id: classroom._id,
+                name: classroom.name,
+                grade: classroom.grade,
+                section: classroom.section,
+                capacity: classroom.capacity,
+                studentCount,
+                availableSeats: classroom.capacity - studentCount,
+                utilizationRate: classroom.capacity > 0
+                    ? Math.round((studentCount / classroom.capacity) * 100)
+                    : 0
+            };
+        }));
+
+        // Calculate overall utilization rate
+        const utilizationRate = totalCapacity > 0
+            ? Math.round((activeStudents / totalCapacity) * 100)
+            : 0;
+
+        return {
+            school: {
+                id: school._id,
+                name: school.name
+            },
+            statistics: {
+                totalClassrooms,
+                totalStudents,
+                activeStudents,
+                totalCapacity,
+                availableSeats: totalCapacity - activeStudents,
+                utilizationRate,
+                statusDistribution,
+                genderDistribution,
+                gradeBreakdown,
+                classroomBreakdown
+            }
+        };
     }
 }

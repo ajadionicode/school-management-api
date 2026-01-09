@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
+    "dev": "nodemon index.js",
     "seed:superadmin": "node scripts/seedSuperadmin.js",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
@@ -13,7 +13,7 @@
     "docker:run": "docker run -p 5111:5111 --env-file .env school-management-api",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f app",
+    "docker:logs": "docker-compose logs -f",
     "docker:clean": "docker-compose down -v --rmi local"
   },
   "author": "",
@@ -40,6 +40,7 @@
   },
   "devDependencies": {
     "jest": "^29.0.0",
+    "nodemon": "^3.0.0",
     "supertest": "^6.3.0"
   }
 }
