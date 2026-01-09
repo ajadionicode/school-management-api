@@ -29,8 +29,9 @@ tests
 *.test.js
 jest.config.js
 
-# Documentation (keep README)
-docs
+# Documentation (keep README and OpenAPI spec)
+docs/*
+!docs/openapi.yaml
 *.md
 !README.md
 
