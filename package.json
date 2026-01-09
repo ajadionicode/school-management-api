@@ -8,7 +8,13 @@
     "dev": "node index.js",
     "seed:superadmin": "node scripts/seedSuperadmin.js",
     "test": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "docker:build": "docker build -t school-management-api .",
+    "docker:run": "docker run -p 5111:5111 --env-file .env school-management-api",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f app",
+    "docker:clean": "docker-compose down -v --rmi local"
   },
   "author": "",
   "license": "ISC",

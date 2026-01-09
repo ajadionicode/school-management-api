@@ -3,6 +3,7 @@ const Cortex                = require('ion-cortex');
 const ManagersLoader        = require('./loaders/ManagersLoader.js');
 const Aeon                  = require('aeon-machine');
 const mongo                 = require('./connect/mongo.js');
+const mongoose              = require('mongoose');
 
 // Connect to MongoDB
 if (config.dotEnv.MONGO_URI) {
@@ -48,3 +49,36 @@ const managersLoader = new ManagersLoader({config, cache, cortex, oyster, aeon})
 const managers = managersLoader.load();
 
 managers.userServer.run();
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+    console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+    // Give existing requests time to complete (30 second timeout)
+    const shutdownTimeout = setTimeout(() => {
+        console.log('Shutdown timeout reached, forcing exit...');
+        process.exit(1);
+    }, 30000);
+
+    try {
+        // Close MongoDB connection
+        if (mongoose.connection.readyState === 1) {
+            console.log('Closing MongoDB connection...');
+            await mongoose.connection.close();
+            console.log('MongoDB connection closed.');
+        }
+
+        // Clear timeout and exit cleanly
+        clearTimeout(shutdownTimeout);
+        console.log('Graceful shutdown completed.');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error);
+        clearTimeout(shutdownTimeout);
+        process.exit(1);
+    }
+};
+
+// Listen for termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
