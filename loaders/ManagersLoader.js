@@ -83,7 +83,7 @@ module.exports = class ManagersLoader {
         this.managers.student             = new Student(this.injectable);
         /*************************************************************************************************/
 
-        this.managers.mwsExec             = new VirtualStack({ ...{ preStack: ['__device'] }, ...this.injectable });
+        this.managers.mwsExec             = new VirtualStack({ ...{ preStack: ['__device', '__rateLimit'] }, ...this.injectable });
         this.managers.userApi             = new ApiHandler({...this.injectable,...{prop:'httpExposed'}});
         this.managers.userServer          = new UserServer({ config: this.config, managers: this.managers });
 
