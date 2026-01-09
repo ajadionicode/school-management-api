@@ -28,10 +28,6 @@ COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 # Copy application code
 COPY --chown=nodejs:nodejs . .
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV USER_PORT=5111
-
 # Expose the port
 EXPOSE 5111
 
