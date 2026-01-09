@@ -24,6 +24,8 @@ info:
 servers:
   - url: http://localhost:5111
     description: Development server
+  - url: https://soar-school-management-api.ajadionicode.com
+    description: Production server
 
 tags:
   - name: Auth
