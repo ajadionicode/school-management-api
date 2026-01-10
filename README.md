@@ -435,6 +435,58 @@ school-management-api/
 
 ---
 
+## Design Assumptions
+
+This API was built with the following assumptions and constraints in mind:
+
+### Authentication & Authorization
+
+| Assumption | Description |
+|------------|-------------|
+| **Two-tier role system** | Only `superadmin` and `school_admin` roles exist. No teacher, parent, or student login roles. |
+| **Superadmins have global access** | Can manage all schools, users, and data across the entire system. |
+| **School admins are scoped to one school** | A `school_admin` can only manage classrooms and students within their assigned school (RBAC enforcement). |
+| **Seeded superadmin is immutable** | The default superadmin account cannot be modified or deleted to ensure demo/testing access always works. |
+
+### Data Model
+
+| Assumption | Description |
+|------------|-------------|
+| **Soft deletes everywhere** | Records are never physically deleted; they use `isDeleted` flag with `deletedAt` timestamp for audit trails. |
+| **One classroom per student** | Students can only be assigned to a single classroom at a time (no multi-class enrollment). |
+| **One school per school_admin** | Admins are tied to exactly one school via `schoolId`. |
+| **School names are globally unique** | No two schools can share the same name across the system. |
+| **Classroom names are unique within a school** | Same name can exist in different schools, but not within the same school. |
+
+### Business Logic
+
+| Assumption | Description |
+|------------|-------------|
+| **Capacity is a hard limit** | Students cannot be assigned to classrooms that are at full capacity. |
+| **Classrooms with students cannot be deleted** | Must transfer or remove all students before deleting a classroom. |
+| **Student transfers are superadmin-only** | School admins cannot transfer students between schools. |
+| **Transfer history is preserved** | When students transfer schools, the complete history is recorded. |
+
+### Security
+
+| Assumption | Description |
+|------------|-------------|
+| **Account lockout after 5 failed attempts** | 15-minute lockout period for brute force protection. |
+| **Rate limiting is IP-based** | Uses client IP from request headers for tracking requests. |
+| **Auth endpoints have stricter rate limits** | Login/refresh/logout have 5 req/15min vs 100 req/15min for general API. |
+| **Passwords require complexity** | Minimum 8 characters with uppercase, lowercase, and number required. |
+
+### Infrastructure
+
+| Assumption | Description |
+|------------|-------------|
+| **Redis is required** | Used for caching, rate limiting counters, and session management. |
+| **MongoDB is the primary database** | All entities stored in MongoDB with Mongoose ODM. |
+| **Single-tenant architecture** | One database serves all schools (not isolated databases per school). |
+| **Stateless API design** | No server-side sessions; all state is in JWT tokens and Redis. |
+
+---
+
 ## Error Codes & Handling
 
 All API responses follow a consistent format:
