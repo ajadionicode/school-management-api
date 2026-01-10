@@ -98,8 +98,9 @@ module.exports = class Student {
         };
     }
 
-    async getStudent({ __schoolToken, __schoolAdmin, id }) {
+    async getStudent({ __schoolToken, __schoolAdmin, __query }) {
         const { schoolId } = __schoolAdmin;
+        const id = __query.id || {};
 
         let result = await this.validators.student.getStudent({ id });
         if (result) return { errors: result };
@@ -143,9 +144,9 @@ module.exports = class Student {
     }
 
     async getStudents({
-        __schoolToken, __schoolAdmin, __pagination,
-        classroomId, status, gender, search
+        __schoolToken, __schoolAdmin, __pagination, __query
     }) {
+        const { classroomId, status, gender, search } = __query || {};
         const { schoolId } = __schoolAdmin;
         const { skip, limit, sort } = __pagination;
 
@@ -252,7 +253,8 @@ module.exports = class Student {
         };
     }
 
-    async deleteStudent({ __schoolToken, __schoolAdmin, id }) {
+    async deleteStudent({ __schoolToken, __schoolAdmin, __query }) {
+        const id = __query.id || {};
         const { schoolId } = __schoolAdmin;
 
         let result = await this.validators.student.deleteStudent({ id });
@@ -276,7 +278,7 @@ module.exports = class Student {
         return { message: 'Student deleted successfully' };
     }
 
-    async transferStudent({ __schoolToken, __superadmin, studentId, toSchoolId, reason }) {
+    async transferStudent({ __schoolToken, __schoolAdmin, studentId, toSchoolId, reason }) {
         let result = await this.validators.student.transferStudent({ studentId, toSchoolId, reason });
         if (result) return { errors: result };
 

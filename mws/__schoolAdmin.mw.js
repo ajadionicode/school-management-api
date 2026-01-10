@@ -13,7 +13,7 @@ module.exports = ({ meta, config, managers }) => {
         // Superadmins can also access school admin routes
         if (tokenData.role === 'superadmin') {
             // For superadmins, schoolId must be provided in request body or query
-            const requestSchoolId = req.body.schoolId || req.query.schoolId;
+            const requestSchoolId = req.body.schoolId || req.query.schoolId || req.body.id || req.query.id;
             if (!requestSchoolId) {
                 return managers.responseDispatcher.dispatch(res, {
                     ok: false,

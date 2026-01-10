@@ -72,7 +72,8 @@ module.exports = class Classroom {
         };
     }
 
-    async getClassroom({ __schoolToken, __schoolAdmin, id }) {
+    async getClassroom({ __schoolToken, __schoolAdmin, __query }) {
+        const id = __query.id || {};
         const { schoolId } = __schoolAdmin;
 
         let result = await this.validators.classroom.getClassroom({ id });
@@ -112,7 +113,8 @@ module.exports = class Classroom {
         };
     }
 
-    async getClassrooms({ __schoolToken, __schoolAdmin, __pagination, grade, section, search }) {
+    async getClassrooms({ __schoolToken, __schoolAdmin, __pagination, __query }) {
+        const { grade, section, search } = __query || {};
         const { schoolId } = __schoolAdmin;
         const { skip, limit, sort } = __pagination;
 
@@ -249,7 +251,8 @@ module.exports = class Classroom {
         };
     }
 
-    async deleteClassroom({ __schoolToken, __schoolAdmin, id }) {
+    async deleteClassroom({ __schoolToken, __schoolAdmin, __query }) {
+        const id = __query.id || {};
         const { schoolId } = __schoolAdmin;
 
         let result = await this.validators.classroom.deleteClassroom({ id });

@@ -61,7 +61,8 @@ module.exports = class School {
         };
     }
 
-    async getSchool({ __schoolToken, __superadmin, id }) {
+    async getSchool({ __schoolToken, __superadmin, __query }) {
+        const id = __query.id || {};
         let result = await this.validators.school.getSchool({ id });
         if (result) return { errors: result };
 
@@ -90,7 +91,8 @@ module.exports = class School {
         };
     }
 
-    async getSchools({ __schoolToken, __superadmin, __pagination, search }) {
+    async getSchools({ __schoolToken, __superadmin, __pagination, __query }) {
+        const { search } = __query || {};
         const { skip, limit, sort } = __pagination;
 
         const query = { isDeleted: false };
@@ -178,7 +180,8 @@ module.exports = class School {
         };
     }
 
-    async deleteSchool({ __schoolToken, __superadmin, id }) {
+    async deleteSchool({ __schoolToken, __superadmin, __query }) {
+        const id = __query.id || {}; 
         let result = await this.validators.school.deleteSchool({ id });
         if (result) return { errors: result };
 
@@ -200,17 +203,21 @@ module.exports = class School {
         return { message: 'School deleted successfully' };
     }
 
-    async getStatistics({ __schoolToken, __superadmin, __schoolAdmin, id }) {
+    async getStatistics({ __schoolToken, __schoolAdmin, __query }) {
+        const { id } = __query;
+
         // Determine which school to get statistics for
         let schoolId = id;
 
         // If school admin, they can only view their own school's statistics
-        if (__schoolAdmin && !__superadmin) {
-            if (id && id !== __schoolAdmin.schoolId) {
-                return { error: 'Access denied', code: 403 };
-            }
-            schoolId = __schoolAdmin.schoolId;
-        }
+        // if (__schoolAdmin && !__superadmin) {
+        //     if (id && id !== __schoolAdmin.schoolId) {
+        //         return { error: 'Access denied', code: 403 };
+        //     }
+        //     schoolId = __schoolAdmin.schoolId;
+        // }
+
+        schoolId = __schoolAdmin.schoolId;
 
         if (!schoolId) {
             return { error: 'School ID is required', code: 400 };
