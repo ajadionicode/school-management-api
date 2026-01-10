@@ -419,6 +419,11 @@ describe('User Manager', () => {
         });
 
         it('should soft delete user successfully', async () => {
+            mockMongoModels.user.findOne.mockResolvedValue({
+                _id: 'user123',
+                isDeleted: false,
+                isSeeded: false
+            });
             mockMongoModels.user.findOneAndUpdate.mockResolvedValue({
                 _id: 'user123',
                 isDeleted: true,
@@ -432,6 +437,44 @@ describe('User Manager', () => {
             });
 
             expect(result.message).toBe('User deleted successfully');
+        });
+
+        it('should return 403 when trying to delete seeded account', async () => {
+            mockMongoModels.user.findOne.mockResolvedValue({
+                _id: 'seeded-admin',
+                isDeleted: false,
+                isSeeded: true
+            });
+
+            const result = await userManager.deleteUser({
+                __schoolToken: { userId: 'admin123' },
+                __superadmin: { isSuperadmin: true },
+                id: 'seeded-admin'
+            });
+
+            expect(result.error).toBe('Cannot delete this account');
+            expect(result.code).toBe(403);
+        });
+    });
+
+    describe('seeded account protection', () => {
+        it('should return 403 when trying to update seeded account', async () => {
+            mockMongoModels.user.findOne.mockResolvedValue({
+                _id: 'seeded-admin',
+                username: 'superadmin',
+                isDeleted: false,
+                isSeeded: true
+            });
+
+            const result = await userManager.updateUser({
+                __schoolToken: { userId: 'admin123' },
+                __superadmin: { isSuperadmin: true },
+                id: 'seeded-admin',
+                username: 'newname'
+            });
+
+            expect(result.error).toBe('Cannot modify this account');
+            expect(result.code).toBe(403);
         });
     });
 });

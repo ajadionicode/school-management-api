@@ -51,6 +51,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, enum: ['superadmin', 'school_admin'], required: true },
     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', default: null },
+    isSeeded: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null }
 }, { timestamps: true });
@@ -91,7 +92,8 @@ async function seedSuperadmin() {
             email,
             password: hashedPassword,
             role: 'superadmin',
-            schoolId: null
+            schoolId: null,
+            isSeeded: true
         });
 
         await superadmin.save();

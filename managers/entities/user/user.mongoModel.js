@@ -42,6 +42,11 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // Seeded account protection (cannot change password or delete)
+    isSeeded: {
+        type: Boolean,
+        default: false
+    },
     isDeleted: {
         type: Boolean,
         default: false

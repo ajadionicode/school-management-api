@@ -290,6 +290,14 @@ module.exports = class Auth {
             };
         }
 
+        // Prevent password change for seeded accounts (demo protection)
+        if (user.isSeeded) {
+            return {
+                error: 'Cannot change password for this account',
+                code: 403
+            };
+        }
+
         // Verify current password
         const isValidPassword = await bcrypt.compare(currentPassword, user.password);
         if (!isValidPassword) {

@@ -173,6 +173,11 @@ module.exports = class User {
             return { error: 'User not found', code: 404 };
         }
 
+        // Prevent modification of seeded accounts (demo protection)
+        if (user.isSeeded) {
+            return { error: 'Cannot modify this account', code: 403 };
+        }
+
         // Check for duplicate username/email
         if (username || email) {
             const existingUser = await this.mongomodels.user.findOne({
@@ -242,6 +247,20 @@ module.exports = class User {
         // Prevent self-deletion
         if (id === __schoolToken.userId) {
             return { error: 'Cannot delete your own account', code: 400 };
+        }
+
+        // Check if user is seeded (demo protection)
+        const userToDelete = await this.mongomodels.user.findOne({
+            _id: id,
+            isDeleted: false
+        });
+
+        if (!userToDelete) {
+            return { error: 'User not found', code: 404 };
+        }
+
+        if (userToDelete.isSeeded) {
+            return { error: 'Cannot delete this account', code: 403 };
         }
 
         const user = await this.mongomodels.user.findOneAndUpdate(

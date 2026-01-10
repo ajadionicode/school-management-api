@@ -434,5 +434,23 @@ describe('Auth Manager', () => {
             expect(result.error).toBe('Current password is incorrect');
             expect(result.code).toBe(401);
         });
+
+        it('should return 403 for seeded account password change', async () => {
+            mockMongoModels.user.findOne.mockResolvedValue({
+                _id: 'seeded-admin',
+                password: 'hashed',
+                isDeleted: false,
+                isSeeded: true
+            });
+
+            const result = await authManager.changePassword({
+                __schoolToken: { userId: 'seeded-admin' },
+                currentPassword: 'OldPassword1',
+                newPassword: 'NewPassword1'
+            });
+
+            expect(result.error).toBe('Cannot change password for this account');
+            expect(result.code).toBe(403);
+        });
     });
 });
