@@ -4,9 +4,13 @@
 
 // Mock dependencies
 const mockCache = {
+    hash: {
+        incrby: jest.fn(),
+        setField: jest.fn(),
+        getField: jest.fn()
+    },
     key: {
-        get: jest.fn(),
-        set: jest.fn()
+        expire: jest.fn()
     }
 };
 
@@ -60,24 +64,24 @@ describe('Rate Limiting Middleware', () => {
         mockResults = {
             __device: { ip: '192.168.1.1' }
         };
+
+        // Default mock implementations
+        mockCache.hash.incrby.mockResolvedValue(1);
+        mockCache.hash.setField.mockResolvedValue(true);
+        mockCache.hash.getField.mockResolvedValue(String(Date.now() + 900000));
+        mockCache.key.expire.mockResolvedValue(true);
     });
 
     describe('rate limit headers', () => {
         it('should set X-RateLimit headers', async () => {
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
-
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
             expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 100);
             expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', expect.any(Number));
-            expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(Number));
+            expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Reset', expect.any(String));
         });
 
         it('should pass rate limit info to next middleware', async () => {
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
-
             const result = await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
             expect(mockNext).toHaveBeenCalledWith({
@@ -92,8 +96,7 @@ describe('Rate Limiting Middleware', () => {
 
     describe('global rate limit', () => {
         it('should allow requests under the limit', async () => {
-            mockCache.key.get.mockResolvedValue('50'); // 50 previous requests
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(51); // 51st request (under 100)
 
             const result = await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
@@ -102,8 +105,7 @@ describe('Rate Limiting Middleware', () => {
         });
 
         it('should return 429 when global limit is exceeded', async () => {
-            mockCache.key.get.mockResolvedValue('100'); // Already at limit
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(101); // Over limit
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
@@ -118,25 +120,22 @@ describe('Rate Limiting Middleware', () => {
         });
 
         it('should set Retry-After header when limit exceeded', async () => {
-            mockCache.key.get.mockResolvedValue('100');
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(101);
+            const futureTime = Date.now() + 900000;
+            mockCache.hash.getField.mockResolvedValue(String(futureTime));
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockRes.setHeader).toHaveBeenCalledWith('Retry-After', 900);
+            expect(mockRes.setHeader).toHaveBeenCalledWith('Retry-After', expect.any(Number));
         });
 
         it('should use correct Redis key for global requests', async () => {
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
-
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:global:192.168.1.1' });
-            expect(mockCache.key.set).toHaveBeenCalledWith({
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
                 key: 'ratelimit:global:192.168.1.1',
-                data: '1',
-                ttl: 900
+                field: 'count',
+                incr: 1
             });
         });
     });
@@ -150,8 +149,7 @@ describe('Rate Limiting Middleware', () => {
         });
 
         it('should use stricter limit for auth endpoints', async () => {
-            mockCache.key.get.mockResolvedValue('3');
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(4); // 4th request
 
             const result = await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
@@ -161,8 +159,7 @@ describe('Rate Limiting Middleware', () => {
         });
 
         it('should return 429 when auth limit exceeded', async () => {
-            mockCache.key.get.mockResolvedValue('5');
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(6); // Over auth limit of 5
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
@@ -176,92 +173,106 @@ describe('Rate Limiting Middleware', () => {
         });
 
         it('should use correct Redis key for auth requests', async () => {
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
-
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:auth:192.168.1.1' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:auth:192.168.1.1',
+                field: 'count',
+                incr: 1
+            });
         });
 
         it('should apply auth limit to refreshToken endpoint', async () => {
             mockReq.params.fnName = 'refreshToken';
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:auth:192.168.1.1' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:auth:192.168.1.1',
+                field: 'count',
+                incr: 1
+            });
             expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', 5);
         });
 
         it('should apply auth limit to logout endpoint', async () => {
             mockReq.params.fnName = 'logout';
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:auth:192.168.1.1' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:auth:192.168.1.1',
+                field: 'count',
+                incr: 1
+            });
         });
     });
 
     describe('client IP handling', () => {
         it('should use IP from __device middleware', async () => {
             mockResults.__device = { ip: '10.0.0.1' };
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:global:10.0.0.1' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:global:10.0.0.1',
+                field: 'count',
+                incr: 1
+            });
         });
 
         it('should use "N/A" if IP not available', async () => {
             mockResults.__device = { ip: 'N/A' };
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:global:N/A' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:global:N/A',
+                field: 'count',
+                incr: 1
+            });
         });
 
         it('should handle N/A IP from __device middleware', async () => {
             mockResults = { __device: { ip: 'N/A' } };
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.get).toHaveBeenCalledWith({ key: 'ratelimit:global:N/A' });
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
+                key: 'ratelimit:global:N/A',
+                field: 'count',
+                incr: 1
+            });
         });
     });
 
     describe('Redis counter management', () => {
         it('should increment counter on each request', async () => {
-            mockCache.key.get.mockResolvedValue('10');
-            mockCache.key.set.mockResolvedValue(true);
+            mockCache.hash.incrby.mockResolvedValue(11); // Returns new count after increment
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.set).toHaveBeenCalledWith({
+            expect(mockCache.hash.incrby).toHaveBeenCalledWith({
                 key: 'ratelimit:global:192.168.1.1',
-                data: '11',
-                ttl: 900
+                field: 'count',
+                incr: 1
             });
+            expect(mockRes.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', 89);
         });
 
-        it('should start from 1 if no existing count', async () => {
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
+        it('should set expiry on first request', async () => {
+            mockCache.hash.incrby.mockResolvedValue(1); // First request
 
             await rateLimitMiddleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
-            expect(mockCache.key.set).toHaveBeenCalledWith({
+            expect(mockCache.key.expire).toHaveBeenCalledWith({
                 key: 'ratelimit:global:192.168.1.1',
-                data: '1',
-                ttl: 900
+                expire: 900
+            });
+            expect(mockCache.hash.setField).toHaveBeenCalledWith({
+                key: 'ratelimit:global:192.168.1.1',
+                fieldKey: 'expiresAt',
+                data: expect.any(String)
             });
         });
     });
@@ -274,9 +285,6 @@ describe('Rate Limiting Middleware', () => {
                 cache: mockCache,
                 managers: mockManagers
             });
-
-            mockCache.key.get.mockResolvedValue(null);
-            mockCache.key.set.mockResolvedValue(true);
 
             await middleware({ req: mockReq, res: mockRes, next: mockNext, results: mockResults });
 
