@@ -177,7 +177,7 @@ describe('Student Manager', () => {
             const result = await studentManager.getStudent({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'student123'
+                __query: { id: 'student123' }
             });
 
             expect(result.student).toBeDefined();
@@ -199,7 +199,7 @@ describe('Student Manager', () => {
             const result = await studentManager.getStudent({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'student-from-other-school'
+                __query: { id: 'student-from-other-school' }
             });
 
             expect(result.error).toBe('Student not found');
@@ -308,7 +308,7 @@ describe('Student Manager', () => {
             const result = await studentManager.deleteStudent({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'student123'
+                __query: { id: 'student123' }
             });
 
             expect(result.message).toBe('Student deleted successfully');
@@ -321,7 +321,7 @@ describe('Student Manager', () => {
             const result = await studentManager.deleteStudent({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'student-from-other-school'
+                __query: { id: 'student-from-other-school' }
             });
 
             expect(result.error).toBe('Student not found');

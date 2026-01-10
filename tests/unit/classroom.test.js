@@ -147,7 +147,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.getClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'invalid'
+                __query: { id: 'invalid' }
             });
 
             expect(result.errors).toBeDefined();
@@ -175,7 +175,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.getClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'class123'
+                __query: { id: 'class123' }
             });
 
             expect(result.classroom).toBeDefined();
@@ -194,7 +194,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.getClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'class-from-other-school'
+                __query: { id: 'class-from-other-school' }
             });
 
             expect(result.error).toBe('Classroom not found');
@@ -343,7 +343,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.deleteClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: '507f1f77bcf86cd799439011'
+                __query: { id: '507f1f77bcf86cd799439011' }
             });
 
             expect(result.error).toContain('Cannot delete classroom with 5 students');
@@ -363,7 +363,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.deleteClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'class123'
+                __query: { id: 'class123' }
             });
 
             expect(result.message).toBe('Classroom deleted successfully');
@@ -376,7 +376,7 @@ describe('Classroom Manager', () => {
             const result = await classroomManager.deleteClassroom({
                 __schoolToken: { userId: 'admin123' },
                 __schoolAdmin: { schoolId: 'school123', userId: 'admin123' },
-                id: 'class-from-other-school'
+                __query: { id: 'class-from-other-school' }
             });
 
             expect(result.error).toBe('Classroom not found');

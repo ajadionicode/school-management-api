@@ -193,7 +193,8 @@ describe('User Manager', () => {
         it('should return error if user ID is missing', async () => {
             const result = await userManager.getUser({
                 __schoolToken: { userId: 'admin123' },
-                __superadmin: { isSuperadmin: true }
+                __superadmin: { isSuperadmin: true },
+                __query: {}
             });
 
             expect(result.error).toBe('User ID is required');
@@ -208,7 +209,7 @@ describe('User Manager', () => {
             const result = await userManager.getUser({
                 __schoolToken: { userId: 'admin123' },
                 __superadmin: { isSuperadmin: true },
-                id: 'nonexistent-user'
+                __query: { id: 'nonexistent-user' }
             });
 
             expect(result.error).toBe('User not found');
@@ -231,7 +232,7 @@ describe('User Manager', () => {
             const result = await userManager.getUser({
                 __schoolToken: { userId: 'admin123' },
                 __superadmin: { isSuperadmin: true },
-                id: 'user123'
+                __query: { id: 'user123' }
             });
 
             expect(result.user).toBeDefined();
