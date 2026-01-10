@@ -97,7 +97,8 @@ module.exports = class User {
         };
     }
 
-    async getUser({ __schoolToken, __superadmin, id }) {
+    async getUser({ __schoolToken, __superadmin, __query }) {
+        const id = __query.id;
         if (!id) {
             return { error: 'User ID is required', code: 400 };
         }
@@ -124,7 +125,8 @@ module.exports = class User {
         };
     }
 
-    async getUsers({ __schoolToken, __superadmin, __pagination, role, schoolId }) {
+    async getUsers({ __schoolToken, __superadmin, __pagination, __query }) {
+        const { role, schoolId } = __query || {};
         const { skip, limit, sort } = __pagination;
 
         const query = { isDeleted: false };
