@@ -27,32 +27,38 @@ module.exports = ({ meta, config, cache, managers }) => {
         const keyPrefix = isAuthEndpoint ? 'ratelimit:auth:' : 'ratelimit:global:';
         const key = `${keyPrefix}${clientIp}`;
 
-        // Get current count from Redis
-        let currentCount = await cache.key.get({ key });
-        currentCount = parseInt(currentCount) || 0;
+        // Atomic increment on a hash field 'count'
+        const currentCount = await cache.hash.incrby({ key, field: 'count', incr: 1 });
 
-        currentCount++;
+        if (parseInt(currentCount, 10) === 1) { 
+            await cache.key.expire({ key, expire: WINDOW_SECONDS });
 
-        await cache.key.set({
-            key,
-            data: currentCount.toString(),
-            ttl: WINDOW_SECONDS
-        });
+            const expiresAt = Date.now() + WINDOW_MS;
+            await cache.hash.setField({ key, fieldKey: 'expiresAt', data: String(expiresAt) });
+        }
 
-        // Calculate remaining and reset time
-        const remaining = Math.max(0, limit - currentCount);
-        const now = Date.now();
-        const resetAt = now + WINDOW_MS;
-        const resetAtSeconds = Math.ceil(resetAt / 1000);
+        let expiresAtStr = await cache.hash.getField({ key, fieldKey: 'expiresAt' }); 
+        let expiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null; 
+        const now = Date.now(); 
+
+        // If expiresAt missing for any reason, set a fallback and ensure TTL exists
+        if (!expiresAt || Number.isNaN(expiresAt)) { 
+            expiresAt = now + WINDOW_MS; 
+            await cache.hash.setField({ key, fieldKey: 'expiresAt', data: String(expiresAt) }); 
+            await cache.key.expire({ key, expire: WINDOW_SECONDS }); 
+        } 
+
+        const remaining = Math.max(0, limit - parseInt(currentCount, 10)); 
+        // const resetAtSeconds = Math.ceil(expiresAt / 1000); 
+        const retryAfterSeconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
         // Set rate limit headers
         res.setHeader('X-RateLimit-Limit', limit);
         res.setHeader('X-RateLimit-Remaining', remaining);
-        res.setHeader('X-RateLimit-Reset', resetAtSeconds);
+        res.setHeader('X-RateLimit-Reset', new Date(expiresAt).toUTCString());
 
         // Check if rate limit exceeded
         if (currentCount > limit) {
-            const retryAfterSeconds = WINDOW_SECONDS;
             res.setHeader('Retry-After', retryAfterSeconds);
 
             return managers.responseDispatcher.dispatch(res, {
@@ -62,6 +68,6 @@ module.exports = ({ meta, config, cache, managers }) => {
             });
         }
 
-        return next({ rateLimit: { limit, remaining, reset: resetAt } });
+        return next({ rateLimit: { limit, remaining, reset: expiresAt } });
     };
 };
