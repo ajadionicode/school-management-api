@@ -11,6 +11,17 @@ A RESTful API for managing schools, classrooms, and students built with the Axio
 | [/api-docs](https://soar-school-management-api.ajadionicode.com/api-docs) | Interactive Swagger UI Documentation |
 | [/health](https://soar-school-management-api.ajadionicode.com/health) | Health check endpoint |
 
+### Demo Credentials
+
+Use the following credentials to test the API:
+
+| Field | Value |
+|-------|-------|
+| Username | `superadmin` |
+| Password | `SecurePass123@$` |
+
+> **Note:** The seeded superadmin account is protected and cannot be modified or deleted. This ensures the demo remains accessible to all users. If you want to test features like **change password**, **update user**, or **delete user**, simply create a new superadmin account using the `/api/user/createUser` endpoint while logged in as the seeded superadmin.
+
 ## Features
 
 - **Multi-tenancy**: Single database with school-level data isolation
@@ -359,6 +370,22 @@ npm run test:watch
 
 # Run specific test file
 npm test -- tests/unit/auth.test.js
+```
+
+### Test Coverage
+
+| Module | Statements | Branches | Functions | Lines |
+|--------|------------|----------|-----------|-------|
+| **Auth** | 98.85% | 89.65% | 100% | 98.83% |
+| **User** | 92.40% | 79.10% | 100% | 95.89% |
+| **School** | 93.26% | 71.83% | 100% | 98.91% |
+| **Classroom** | 92.13% | 78.43% | 100% | 98.70% |
+| **Student** | 84.55% | 68.49% | 100% | 97.11% |
+| **Rate Limit** | 91.17% | 84.61% | 100% | 91.17% |
+
+```
+Tests:       128 passed, 128 total
+Test Suites: 7 passed, 7 total
 ```
 
 ---
